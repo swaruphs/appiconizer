@@ -7,6 +7,7 @@ import (
 	png "image/png"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"strings"
@@ -78,9 +79,8 @@ func main() {
 func createCmd() command {
 	fs := flag.NewFlagSet("appiconizer create", flag.ExitOnError)
 	opts := &options{}
-	fmt.Print("Inside create cmd")
-	fs.StringVar(&opts.file, "file", "", "Source file")
-
+	fs.StringVar(&opts.file, "source", "", "Source file")
+	fs.StringVar(&opts.device, "device", "all", "ios/android/all")
 	return command{fs, func(args []string) error {
 		fs.Parse(args)
 		return create(opts)
@@ -95,6 +95,9 @@ func create(opts *options) (err error) {
 		log.Fatal(err)
 	}
 
+	path := filepath.Dir(opts.file)
+	fmt.Println(filePath)
+
 	defer file.Close()
 
 	img, _, err := image.Decode(file)
@@ -102,10 +105,21 @@ func create(opts *options) (err error) {
 		log.Fatal(err)
 	}
 
-	sizes := []uint{29, 58, 87, 80, 120, 120, 180, 40, 76, 152, 167}
+	var sizes []uint
+
+	if opts.device == "ios" {
+		sizes = []uint{29, 58, 87, 80, 120, 120, 180, 40, 76, 152, 167}
+	} else if opts.device == "android" {
+		sizes = []uint{48, 72, 96, 144, 192}
+	} else {
+		sizes = []uint{29, 58, 87, 80, 120, 120, 180, 40, 76, 152, 167, 48, 72, 96, 144, 192}
+	}
+
 	for _, val := range sizes {
 		resizeImage(uint(val), img)
 	}
+
+	fmt.Println("***Done***")
 	return nil
 }
 
@@ -126,7 +140,7 @@ func resizeImage(width uint, img image.Image) {
 		log.Fatal(err)
 	}
 
-	fmt.Println("created ", name, "...")
+	fmt.Println("created", name)
 }
 
 // Version is set at compile time.
@@ -134,15 +148,12 @@ var Version = "???"
 
 const examples = `
 examples:
-  echo "GET http://localhost/" | vegeta attack -duration=5s | tee results.bin | vegeta report
-  vegeta attack -targets=targets.txt > results.bin
-  vegeta report -inputs=results.bin -reporter=json > metrics.json
-  cat results.bin | vegeta report -reporter=plot > plot.html
-  cat results.bin | vegeta report -reporter="hist[0,100ms,200ms,300ms]"
+  appiconizer create -source icon.png
 `
 
 type options struct {
-	file string
+	file   string
+	device string
 }
 
 type command struct {
