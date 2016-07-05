@@ -103,7 +103,7 @@ func create(opts *options) (err error) {
 	}
 
 	sizes := []uint{29, 58, 87, 80, 120, 120, 180, 40, 76, 152, 167}
-	for val := range sizes {
+	for _, val := range sizes {
 		resizeImage(uint(val), img)
 	}
 	return nil
@@ -125,7 +125,8 @@ func resizeImage(width uint, img image.Image) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("created %s", name)
+
+	fmt.Println("created ", name, "...")
 }
 
 // Version is set at compile time.
