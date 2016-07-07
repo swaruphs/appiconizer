@@ -81,6 +81,7 @@ func createCmd() command {
 	opts := &options{}
 	fs.StringVar(&opts.file, "source", "", "Source file")
 	fs.StringVar(&opts.device, "device", "all", "ios/android/all")
+	fs.StringVar(&opts.target, "target", "", "Target location")
 	return command{fs, func(args []string) error {
 		fs.Parse(args)
 		return create(opts)
@@ -88,15 +89,18 @@ func createCmd() command {
 }
 
 func create(opts *options) (err error) {
-	fmt.Println(opts)
 
 	file, err := os.Open(opts.file)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	path := filepath.Dir(opts.file)
-	fmt.Println(filePath)
+	path := opts.target
+	if path == "" {
+		path = filepath.Dir(opts.file)
+	}
+
+	fmt.Println(path)
 
 	defer file.Close()
 
@@ -116,18 +120,20 @@ func create(opts *options) (err error) {
 	}
 
 	for _, val := range sizes {
-		resizeImage(uint(val), img)
+		resizeImage(uint(val), img, path)
 	}
 
 	fmt.Println("***Done***")
 	return nil
 }
 
-func resizeImage(width uint, img image.Image) {
+func resizeImage(width uint, img image.Image, path string) {
 
 	name := fmt.Sprintf("icon_%d.png", width)
+	newPath := filepath.Join(path, name)
 	m := resize.Resize(width, 0, img, resize.Lanczos3)
-	out, err := os.Create(name)
+
+	out, err := os.Create(newPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -154,6 +160,7 @@ examples:
 type options struct {
 	file   string
 	device string
+	target string
 }
 
 type command struct {
