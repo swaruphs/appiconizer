@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"flag"
 	"fmt"
 	"image"
@@ -11,6 +12,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"strings"
+	"time"
 
 	"github.com/nfnt/resize"
 )
@@ -82,6 +84,7 @@ func createCmd() command {
 	fs.StringVar(&opts.file, "source", "", "Source file")
 	fs.StringVar(&opts.device, "device", "all", "ios/android/all")
 	fs.StringVar(&opts.target, "target", "", "Target location")
+	fs.BoolVar(&opts.zip, "zip", false, "zip files")
 	return command{fs, func(args []string) error {
 		fs.Parse(args)
 		return create(opts)
@@ -90,16 +93,21 @@ func createCmd() command {
 
 func create(opts *options) (err error) {
 
+	fmt.Println(opts)
 	file, err := os.Open(opts.file)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	var fileName = file.Name()
+	var extension = filepath.Ext(file.Name())
+	var name = opts.file[0 : len(fileName)-len(extension)]
+	opts.name = name
+
 	path := opts.target
 	if path == "" {
 		path = filepath.Dir(opts.file)
 	}
-
 	fmt.Println(path)
 
 	defer file.Close()
@@ -112,23 +120,68 @@ func create(opts *options) (err error) {
 	var sizes []uint
 
 	if opts.device == "ios" {
-		sizes = []uint{29, 58, 87, 80, 120, 120, 180, 40, 76, 152, 167}
+		sizes = []uint{29, 48, 55, 58, 87, 88, 80, 120, 180, 40, 76, 152, 167, 172, 196}
 	} else if opts.device == "android" {
 		sizes = []uint{48, 72, 96, 144, 192}
 	} else {
-		sizes = []uint{29, 58, 87, 80, 120, 120, 180, 40, 76, 152, 167, 48, 72, 96, 144, 192}
+		sizes = []uint{29, 48, 55, 58, 87, 88, 80, 120, 180, 40, 76, 152, 167, 48, 72, 96, 144, 192, 172, 196}
 	}
 
-	for _, val := range sizes {
-		resizeImage(uint(val), img, path)
+	if opts.zip == true {
+		zipFile(opts, sizes, &img, path)
+	} else {
+		dirPath := filepath.Join(path, getFolderName())
+		os.Mkdir(dirPath, 0777)
+		for _, val := range sizes {
+			resizeImage(uint(val), img, dirPath)
+		}
 	}
-
 	fmt.Println("***Done***")
 	return nil
 }
 
-func resizeImage(width uint, img image.Image, path string) {
+// Func to create zip file with list of all icons
+func zipFile(opts *options, sizes []uint, img *image.Image, path string) {
 
+	fileName := fmt.Sprintf("%s.%s", getFolderName(), "zip")
+	zipPath := filepath.Join(path, fileName)
+	writer, err := os.Create(zipPath)
+	defer writer.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	w := zip.NewWriter(writer)
+
+	for _, width := range sizes {
+		name := fmt.Sprintf("icon_%d.png", width)
+		m := resize.Resize(width, 0, *img, resize.Lanczos3)
+		f, err := w.Create(name)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = png.Encode(f, m)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	// Make sure to check the error on Close.
+	err = w.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func getFolderName() string {
+	t := time.Now()
+	timeStr := t.Format("2006-01-02 15.04.05")
+	return fmt.Sprintf("appiconizer %s", timeStr)
+}
+
+//called only for normal icon creation.
+func resizeImage(width uint, img image.Image, path string) {
 	name := fmt.Sprintf("icon_%d.png", width)
 	newPath := filepath.Join(path, name)
 	m := resize.Resize(width, 0, img, resize.Lanczos3)
@@ -150,7 +203,7 @@ func resizeImage(width uint, img image.Image, path string) {
 }
 
 // Version is set at compile time.
-var Version = "???"
+var Version = "0.1"
 
 const examples = `
 examples:
@@ -161,6 +214,8 @@ type options struct {
 	file   string
 	device string
 	target string
+	zip    bool
+	name   string
 }
 
 type command struct {
