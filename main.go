@@ -93,7 +93,6 @@ func createCmd() command {
 
 func create(opts *options) (err error) {
 
-	fmt.Println(opts)
 	file, err := os.Open(opts.file)
 	if err != nil {
 		log.Fatal(err)
@@ -108,7 +107,6 @@ func create(opts *options) (err error) {
 	if path == "" {
 		path = filepath.Dir(opts.file)
 	}
-	fmt.Println(path)
 
 	defer file.Close()
 
